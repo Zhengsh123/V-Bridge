@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V-Bridge - Video Generation for Image Restoration</title>
+    <!-- Include Tailwind CSS for rapid modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Include FontAwesome icon library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #fafafa;
+            color: #1a1a1a;
+            scroll-behavior: smooth;
+        }
+
+        
+        .badge-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .badge-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+        }
+        .badge-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        .comparison-slider {
+            position: relative;
+            width: 100%;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            background-color: #eee;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .comparison-slider:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        .comparison-slider::after {
+            content: 'Double-click to play the video.';
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(147, 51, 234, 0.9));
+            color: white;
+            padding: 8px 20px;
+            border-radius: 24px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 26;
+            backdrop-filter: blur(8px);
+        }
+        .comparison-slider:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-4px);
+        }
+
+        .comparison-slider img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .before-image {
+            clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+            z-index: 10;
+        }
+
+        .after-image {
+            z-index: 5;
+        }
+        
+
+        .slider-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 30;
+            opacity: 0;
+            cursor: ew-resize;
+            margin: 0;
+        }
+        .slider-input:active {
+            cursor: grabbing;
+        }
+        
+
+        .slider-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            bottom: 0;
+            width: 2px;
+            background-color: white;
+            z-index: 20;
+            transform: translateX(-50%);
+            pointer-events: none;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        .slider-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            background-color: white;
+            border-radius: 50%;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .slider-button::before,
+        .slider-button::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+        }
+        .slider-button::before {
+            border-right: 6px solid #333;
+            left: 6px;
+        }
+        .slider-button::after {
+            border-left: 6px solid #333;
+            right: 6px;
+        }
+
+
+        .label-before, .label-after {
+            position: absolute;
+            top: 10px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 25;
+            pointer-events: none;
+        }
+        .label-before { left: 10px; }
+        .label-after { right: 10px; }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Pacifico&display=swap');
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+        }
+        .bg-row {
+            will-change: transform;
+        }
+
+        #more-results-modal {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        #more-results-modal .modal-content {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        #more-results-modal .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        #more-results-modal .modal-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #more-results-modal .modal-content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        #more-results-modal .modal-content::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        #more-comparison-modal {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        #more-comparison-modal .modal-content {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        #more-comparison-modal .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        #more-comparison-modal .modal-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #more-comparison-modal .modal-content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        #more-comparison-modal .modal-content::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .comparison-video-card {
+            position: relative;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            background-color: #fff;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .comparison-video-card:hover {
+            transform: translateY(-6px) scale(1.01);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+        }
+        .comparison-video-card video {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.4s ease;
+        }
+        .comparison-video-card:hover video {
+            transform: scale(1.02);
+        }
+        .comparison-video-card .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .comparison-video-card .label-tag {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .comparison-video-card:hover .label-tag {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+        .label-ours {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(59, 130, 246, 0.95));
+        }
+        .label-foundir {
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.95), rgba(168, 85, 247, 0.95));
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .label-gt {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(52, 211, 153, 0.95));
+            margin-left: auto;
+        }
+
+        .degradation-badge {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 20;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            opacity: 1;
+        }
+        .comparison-slider:hover .degradation-badge,
+        .comparison-video-card:hover .degradation-badge {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        .degradation-badges {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            z-index: 20;
+            pointer-events: none;
+            max-width: calc(100% - 24px);
+        }
+        .comparison-slider:hover .degradation-badges,
+        .comparison-video-card:hover .degradation-badges {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+        .degradation-badges .degradation-badge {
+            position: relative;
+            bottom: auto;
+            left: auto;
+            margin: 0;
+        }
+        .degradation-badge i {
+            font-size: 0.9rem;
+        }
+
+        .deg-blur {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.92), rgba(220, 38, 38, 0.92));
+        }
+        .deg-noise {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.92), rgba(234, 88, 12, 0.92));
+        }
+        .deg-low-light {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.92), rgba(79, 70, 229, 0.92));
+        }
+        .deg-rain {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.92), rgba(2, 132, 199, 0.92));
+        }
+        .deg-haze {
+            background: linear-gradient(135deg, rgba(156, 163, 175, 0.92), rgba(107, 114, 128, 0.92));
+        }
+        .deg-mixed {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.92), rgba(147, 51, 234, 0.92));
+        }
+        .deg-snow {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.92), rgba(147, 197, 253, 0.92));
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        section {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+
+        button {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+
+        @keyframes gradient {
+            0%, 100% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        .animate-gradient {
+            background-size: 200% 200%;
+            animation: gradient 3s ease infinite;
+        }
+
+        img {
+            transition: transform 0.3s ease;
+        }
+
+        img:hover {
+            transform: scale(1.02);
+        }
+
+        a {
+            transition: all 0.2s ease;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800 relative bg-[#fafafa]">
+
+    <!-- Background color gradient -->
+    <div class="fixed inset-0 pointer-events-none -z-20" style="background: radial-gradient(circle at top left, #f4e8ff 0%, #e6f4fe 40%, transparent 80%);"></div>
+
+    <!-- Hero Section (header display area) -->
+    <header class="relative pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto text-center z-10">
+        <!-- Logo -->
+        <div class="mb-4 flex justify-center items-center gap-4 text-6xl font-bold">
+            <div class="relative w-16 h-16 rounded-full overflow-hidden shadow-[0_0_30px_rgba(139,92,246,0.6)] border-2 border-white animate-pulse">
+                <!-- Simulated colorful bridge element -->
+                <div class="absolute inset-0 bg-gradient-to-br from-cyan-400 via-blue-500 via-purple-600 to-pink-500 opacity-100 animate-gradient"></div>
+                <div class="absolute inset-0 bg-gradient-to-tl from-yellow-400 via-transparent to-transparent opacity-40"></div>
+                <div class="absolute inset-1.5 bg-white rounded-full flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-bridge text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"></i>
+                </div>
+            </div>
+            <span style="font-family: 'Comic Sans MS', cursive; letter-spacing: 2px;">V-Bridge</span>
+        </div>
+        
+        <h1 class="text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-8 text-gray-900 leading-tight animate-fadeInUp" style="font-family: 'Comic Sans MS', cursive; animation-delay: 0.1s;">
+            Bridging <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 animate-gradient" style="background-size: 200% auto;">Video</span> Generative Priors to Versatile <br>Few-shot <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 animate-gradient" style="background-size: 200% auto;">Image Restoration</span>
+        </h1>
+        
+        <p class="text-base md:text-lg lg:text-xl text-gray-600 mb-6 max-w-2xl mx-auto font-medium leading-relaxed">
+            V-Bridge leverages the strong <span class="font-bold">priors of generative models</span> for image restoration tasks, achieving better performance while using only <span class="font-bold text-blue-600">0.1%</span> of the training data required by conventional image restoration methods.
+        </p>
+
+        <p class="text-lg md:text-xl lg:text-2xl text-gray-800 mb-12 font-medium" style="font-family: 'Comic Sans MS', cursive;">
+            We use a <span class="text-blue-600 font-bold">single</span> video generation model to support <span class="text-purple-600 font-bold">all</span> image restoration tasks.
+        </p>
+
+        <!-- Frosted glass card area -->
+        <div class="glass-card mx-auto max-w-4xl p-6 md:p-8 rounded-[2rem] relative z-20">
+            
+            <div class="flex flex-wrap justify-center gap-4 mb-6">
+                <a href="https://arxiv.org" target="_blank" class="badge-btn flex items-center gap-2 bg-gradient-to-r from-white to-gray-50 text-gray-800 px-6 py-3 rounded-full text-sm font-semibold shadow-md border border-gray-200 hover:border-blue-300">
+                    <span class="text-gray-400">📄</span> Paper
+                </a>
+                <a href="https://github.com/Zhengsh123/V-Bridge" target="_blank" class="badge-btn flex items-center gap-2 bg-gradient-to-r from-white to-gray-50 text-gray-800 px-6 py-3 rounded-full text-sm font-semibold shadow-md border border-gray-200 hover:border-blue-300">
+                    <span class="text-blue-400">💻</span> Code
+                </a>
+                <a href="https://huggingface.co/desimfj/V-Bridge" target="_blank" class="badge-btn flex items-center gap-2 bg-gradient-to-r from-white to-gray-50 text-gray-800 px-6 py-3 rounded-full text-sm font-semibold shadow-md border border-gray-200 hover:border-orange-300">
+                    <span>🤗</span> Model
+                </a>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-x-2 gap-y-1 mb-6 text-base md:text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed">
+                <span><a href="https://zhengsh123.github.io/" target="_blank" class="hover:text-blue-600 transition-colors">Shenghe Zheng</a><sup class="text-blue-600 text-base">*</sup>,</span>
+                <span><a href="https://openreview.net/profile?id=%7EJunpeng_Jiang2" target="_blank" class="hover:text-blue-600 transition-colors">Junpeng Jiang</a><sup class="text-blue-600 text-base">*</sup>,</span>
+                <span><a href="https://fenglinglwb.github.io/" target="_blank" class="hover:text-blue-600 transition-colors">Wenbo Li</a><sup class="text-purple-600 text-base">†</sup></span>
+            </div>
+            <div class="text-sm md:text-base text-gray-500 mb-6 flex flex-wrap justify-center gap-x-4">
+                <span><sup class="text-blue-600 text-base">*</sup> Equal contribution</span>
+                <span><sup class="text-purple-600 text-base">†</sup> Corresponding author</span>
+            </div>
+            
+            <hr class="border-gray-200 mb-6 w-full max-w-2xl mx-auto">
+
+            <div class="flex justify-center items-center gap-8 flex-wrap ml-16">
+                <img src="./logo/hkust.svg" alt="HKUST" class="h-24 object-contain">
+                <img src="./logo/hit.svg" alt="HIT" class="h-24 object-contain">
+                <img src="./logo/cuhk.svg" alt="CUHK" class="h-24 object-contain">
+            </div>
+        </div>
+    </header>
+
+    <section class="max-w-5xl mx-auto px-4 mb-24">
+        <h2 class="text-3xl md:text-4xl font-bold mb-8 text-center text-gray-900 border-b pb-4">V-Bridge Qualitative Results</h2>
+
+        <div id="main-results" class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        </div>
+
+        <div class="text-center mt-8">
+            <button id="show-more-btn" class="group text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-2 transition-all bg-gradient-to-r from-white to-blue-50 px-8 py-3 rounded-full shadow-md hover:shadow-xl border-2 border-blue-100 hover:border-blue-300">
+                More Results
+                <i class="fa-solid fa-arrow-down text-sm group-hover:translate-y-1 transition-transform"></i>
+            </button>
+        </div>
+    </section>
+
+    <!-- Method Comparison Section -->
+    <section class="max-w-5xl mx-auto px-4 mb-24">
+        <h2 class="text-3xl md:text-4xl font-bold mb-8 text-center text-gray-900 border-b pb-4">Method Comparison</h2>
+        <p class="text-lg text-gray-600 mb-10 text-center max-w-3xl mx-auto">
+            Each video shows three parts: <span class="font-semibold text-blue-600">Ours</span>, <span class="font-semibold text-purple-600">FoundIR</span>, and <span class="font-semibold text-green-600">Ground Truth</span>.
+        </p>
+
+        <div id="comparison-results" class="grid grid-cols-1 gap-6 mb-8">
+        </div>
+
+        <div class="text-center mt-8">
+            <button id="show-more-comparison-btn" class="group text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-2 transition-all bg-gradient-to-r from-white to-blue-50 px-8 py-3 rounded-full shadow-md hover:shadow-xl border-2 border-blue-100 hover:border-blue-300">
+                More Comparisons
+                <i class="fa-solid fa-arrow-down text-sm group-hover:translate-y-1 transition-transform"></i>
+            </button>
+        </div>
+    </section>
+
+    <div id="more-comparison-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl w-full max-w-6xl shadow-2xl modal-content">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl flex items-center justify-between z-50">
+                <h3 class="text-2xl font-bold text-gray-800">More Comparisons</h3>
+                <button id="close-more-comparison-modal" class="w-10 h-10 bg-gray-100 rounded-full shadow flex items-center justify-center hover:bg-gray-200 transition-colors relative z-50">
+                    <i class="fa-solid fa-times text-gray-700 text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="more-comparison-grid" class="grid grid-cols-1 gap-6">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="more-results-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl w-full max-w-6xl shadow-2xl modal-content">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl flex items-center justify-between z-50">
+                <h3 class="text-2xl font-bold text-gray-800">More Results</h3>
+                <button id="close-more-modal" class="w-10 h-10 bg-gray-100 rounded-full shadow flex items-center justify-center hover:bg-gray-200 transition-colors relative z-50">
+                    <i class="fa-solid fa-times text-gray-700 text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="more-results-grid" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="video-modal" class="fixed inset-0 bg-black bg-opacity-75 z-50 hidden items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <button id="close-modal" class="absolute top-4 right-4 z-50 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
+                <i class="fa-solid fa-times text-gray-700 text-xl"></i>
+            </button>
+            <div class="p-6">
+                <video id="modal-video" class="w-full rounded-lg" controls autoplay>
+                    <source src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teaser Showcase -->
+    <section class="max-w-5xl mx-auto px-4 mb-24 bg-white rounded-3xl p-8 md:p-12 shadow-[0_2px_40px_-15px_rgba(0,0,0,0.05)] border border-gray-50">
+        <h2 class="text-3xl font-bold mb-8 text-center text-gray-900">Method Overview</h2>
+        <p class="text-lg text-gray-600 mb-10 text-center max-w-3xl mx-auto">
+            V-Bridge leverages video generative priors for versatile few-shot image restoration.
+        </p>
+        <div class="flex justify-center">
+            <img src="./imgs/teaser-full.png" alt="V-Bridge Method Overview" class="w-full max-w-5xl rounded-2xl shadow-lg border border-gray-100">
+        </div>
+    </section>
+
+    <!-- Key Features -->
+    <section class="max-w-5xl mx-auto px-4 mb-24 bg-white rounded-3xl p-8 md:p-12 shadow-[0_2px_40px_-15px_rgba(0,0,0,0.05)] border border-gray-50">
+        <h2 class="text-3xl font-bold mb-10 text-gray-900 text-center">Key Features</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div class="flex gap-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">1</div>
+                <div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">New Restoration Paradigm</h3>
+                    <p class="text-gray-600">We pioneer the use of video generative models as universal priors, demonstrating that their inherent representations serve as a powerful, transferable foundation across diverse low-level tasks.</p>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">2</div>
+                <div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">The V-Bridge Framework</h3>
+                    <p class="text-gray-600">We propose V-Bridge, a data-efficient image restoration framework using progressive generative refinement and a coarse-to-fine training with lightweight drift correction.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Framework Image -->
+        <div class="mt-12 flex justify-center">
+            <img src="./imgs/framework.png" alt="V-Bridge Framework" class="w-full max-w-5xl rounded-2xl shadow-lg border border-gray-100">
+        </div>
+    </section>
+
+    
+    <section class="max-w-5xl mx-auto px-4 mb-20 text-center">
+        <div class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 text-blue-900 p-10 md:p-12 rounded-3xl border-2 border-blue-100 shadow-lg hover:shadow-xl transition-all">
+            <p class="font-bold text-xl md:text-2xl lg:text-3xl mb-5 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-relaxed pb-1">V-Bridge</p>
+            <p class="text-base md:text-lg lg:text-xl text-blue-800 leading-relaxed max-w-4xl mx-auto">
+                Experiments on multiple image restoration benchmarks show that V-Bridge matches or exceeds mainstream methods using only 0.1% to 5% of the training data.
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-200 bg-white py-8 text-center text-gray-500 text-sm">
+        <p>&copy; Thank you to the JarvisEvo team for the template.</p>
+    </footer>
+
+
+    <script>
+        const degradationConfig = {
+            'Blur': { icon: 'fa-droplet', class: 'deg-blur' },
+            'Noise': { icon: 'fa-wave-square', class: 'deg-noise' },
+            'Low-Light': { icon: 'fa-moon', class: 'deg-low-light' },
+            'Rain': { icon: 'fa-cloud-rain', class: 'deg-rain' },
+            'Haze': { icon: 'fa-smog', class: 'deg-haze' },
+            'Snow': { icon: 'fa-snowflake', class: 'deg-snow' },
+            'Mixed': { icon: 'fa-layer-group', class: 'deg-mixed' }
+        };
+
+        const videoData = [
+            { folder: 'foundir-2s', name: '0501_2s', degradation: ['Haze'] },
+            { folder: 'foundir-2s', name: '0555_2s', degradation: ['Haze'] },
+            { folder: 'foundir-2s', name: '0752_2s', degradation: ['Low-Light'] },
+            { folder: 'foundir-2s', name: '0790_2s', degradation: ['Low-Light'] },
+            { folder: 'foundir-2s', name: '0827_2s', degradation: ['Rain'] },
+            { folder: 'foundir-2s', name: '1053_2s', degradation: ['Rain', 'Haze'] },
+            { folder: 'foundir-2s', name: '1104_2s', degradation: ['Low-Light'] },
+            { folder: 'foundir-2s', name: '1105_2s', degradation: ['Low-Light'] },
+            { folder: 'foundir-2s', name: '1231_2s', degradation: ['Low-Light', 'Blur'] },
+            { folder: 'foundir-2s', name: '1390_2s', degradation: ['Low-Light', 'Blur','Noise'] },
+            { folder: 'other-2s', name: '11_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: '1223_2s', degradation: ['Low-Light'] },
+            { folder: 'other-2s', name: '16_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: '306_2s', degradation: ['Low-Light'] },
+            { folder: 'other-2s', name: '30_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: '420.jpg_2s', degradation: ['Snow'] },
+            { folder: 'other-2s', name: '421.jpg_2s', degradation: ['Snow'] },
+            { folder: 'other-2s', name: '425.jpg_2s', degradation: ['Snow'] },
+            { folder: 'other-2s', name: '432.jpg_2s', degradation: ['Snow'] },
+            { folder: 'other-2s', name: '453.jpg_2s', degradation: ['Snow'] },
+            { folder: 'other-2s', name: '509.jpg_2s', degradation: ['Snow'] },
+            { folder: 'other-2s', name: '63_2s', degradation: ['Low-Light'] },
+            { folder: 'other-2s', name: '8_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'b4607812-9259ade8_6_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'b5bd48b6-0d0d597f_4_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'b5e387a7-6a010e5e_7_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'c0d85a76-8187c669_2_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'c0db3bd8-9bb194d2_1_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'c1a06160-7046d0fc_8_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'c1f35f18-419afa5e_10_2s', degradation: ['Rain'] },
+            { folder: 'other-2s', name: 'c2eb1910-39269c22_1_2s', degradation: ['Rain'] }
+        ];
+
+        const comparisonVideoData = [
+            { folder: 'other', name: '11_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: '16_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: '30_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: '420.jpg_combined.mp4', degradation: ['Snow'] },
+            { folder: 'other', name: '421.jpg_combined.mp4', degradation: ['Snow'] },
+            { folder: 'other', name: '425.jpg_combined.mp4', degradation: ['Snow'] },
+            { folder: 'other', name: '432.jpg_combined.mp4', degradation: ['Snow'] },
+            { folder: 'other', name: '453.jpg_combined.mp4', degradation: ['Snow'] },
+            { folder: 'other', name: '509.jpg_combined.mp4', degradation: ['Snow'] },
+            { folder: 'other', name: '8_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'b4607812-9259ade8_6_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'b5bd48b6-0d0d597f_4_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'b5e387a7-6a010e5e_7_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'c0d85a76-8187c669_2_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'c0db3bd8-9bb194d2_1_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'c1f35f18-419afa5e_10_combined.mp4', degradation: ['Rain'] },
+            { folder: 'other', name: 'c2eb1910-39269c22_1_combined.mp4', degradation: ['Rain'] },
+
+            { folder: 'foundir', name: '0501_combined.mp4', degradation: ['Haze'] },
+            { folder: 'foundir', name: '0555_combined.mp4', degradation: ['Haze'] },
+            { folder: 'foundir', name: '0752_combined.mp4', degradation: ['Low-Light'] },
+            { folder: 'foundir', name: '0790_combined.mp4', degradation: ['Low-Light'] },
+            { folder: 'foundir', name: '0827_combined.mp4', degradation: ['Rain'] },
+            { folder: 'foundir', name: '1053_combined.mp4', degradation: ['Rain', 'Haze'] },
+            { folder: 'foundir', name: '1104_combined.mp4', degradation: ['Low-Light'] },
+            { folder: 'foundir', name: '1105_combined.mp4', degradation: ['Low-Light'] },
+            { folder: 'foundir', name: '1231_combined.mp4', degradation: ['Low-Light', 'Blur'] },
+            { folder: 'foundir', name: '1390_combined.mp4', degradation: ['Low-Light', 'Blur','Noise'] }
+        ];
+
+
+        function createComparisonVideoCard(videoData) {
+            const videoSrc = `./compare/${videoData.folder}/${videoData.name}`;
+
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'comparison-video-card';
+            cardDiv.dataset.video = videoSrc;
+
+            const degradationBadgesHTML = videoData.degradation.map(degType => {
+                const config = degradationConfig[degType];
+                if (!config) return '';
+                return `
+                    <div class="degradation-badge ${config.class}">
+                        <i class="fa-solid ${config.icon}"></i>
+                        <span>${degType}</span>
+                    </div>
+                `;
+            }).join('');
+
+            cardDiv.innerHTML = `
+                <video muted playsinline>
+                    <source src="${videoSrc}" type="video/mp4">
+                </video>
+                <div class="video-label">
+                    <span class="label-tag label-ours">Ours</span>
+                    <span class="label-tag label-foundir">FoundIR</span>
+                    <span class="label-tag label-gt">Ground Truth</span>
+                </div>
+                <div class="degradation-badges">
+                    ${degradationBadgesHTML}
+                </div>
+            `;
+
+            return cardDiv;
+        }
+
+
+        function initComparisonVideoCard(card) {
+            const video = card.querySelector('video');
+
+            card.addEventListener('mouseenter', () => {
+                video.currentTime = 0; // 重置到开始
+                video.play().catch(err => console.log('Play failed:', err));
+            });
+
+            card.addEventListener('mouseleave', () => {
+                video.pause();
+                video.currentTime = 0;
+            });
+
+            card.addEventListener('click', () => {
+                const videoSrc = card.dataset.video;
+                openVideoModal(videoSrc);
+            });
+        }
+
+        function createComparisonSlider(data) {
+            const beforeImg = `./${data.folder}/${data.name}/${data.name}_first.png`;
+            const afterImg = `./${data.folder}/${data.name}/${data.name}_last.png`;
+            const videoSrc = `./${data.folder}/${data.name}.mp4`;
+
+            const sliderDiv = document.createElement('div');
+            sliderDiv.className = 'comparison-slider group';
+            sliderDiv.dataset.video = videoSrc;
+
+            const degradationBadgesHTML = data.degradation.map(degType => {
+                const config = degradationConfig[degType];
+                if (!config) return '';
+                return `
+                    <div class="degradation-badge ${config.class}">
+                        <i class="fa-solid ${config.icon}"></i>
+                        <span>${degType}</span>
+                    </div>
+                `;
+            }).join('');
+
+            sliderDiv.innerHTML = `
+                <img src="${afterImg}" alt="After" class="after-image">
+                <img src="${beforeImg}" alt="Before" class="before-image">
+
+                <span class="label-before group-hover:opacity-100 opacity-0 transition-opacity">Before</span>
+                <span class="label-after group-hover:opacity-100 opacity-0 transition-opacity">After</span>
+
+                <input type="range" min="0" max="100" value="50" class="slider-input">
+                <div class="slider-line"></div>
+                <div class="slider-button"></div>
+
+                <div class="degradation-badges">
+                    ${degradationBadgesHTML}
+                </div>
+            `;
+
+            return sliderDiv;
+        }
+
+        function initSlider(slider) {
+            const input = slider.querySelector('.slider-input');
+            const beforeImage = slider.querySelector('.before-image');
+            const sliderLine = slider.querySelector('.slider-line');
+            const sliderButton = slider.querySelector('.slider-button');
+
+            let isDragging = false;
+            let mouseDownPos = null;
+
+            input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                beforeImage.style.clipPath = `polygon(0 0, ${value}% 0, ${value}% 100%, 0 100%)`;
+                sliderLine.style.left = `${value}%`;
+                sliderButton.style.left = `${value}%`;
+                isDragging = true;
+            });
+
+            input.addEventListener('mousedown', (e) => {
+                mouseDownPos = { x: e.clientX, y: e.clientY };
+                isDragging = false;
+            });
+
+            input.addEventListener('mousemove', (e) => {
+                if (mouseDownPos) {
+                    const dx = Math.abs(e.clientX - mouseDownPos.x);
+                    const dy = Math.abs(e.clientY - mouseDownPos.y);
+                    if (dx > 5 || dy > 5) {
+                        isDragging = true;
+                    }
+                }
+            });
+
+            input.addEventListener('mouseup', () => {
+                mouseDownPos = null;
+                setTimeout(() => {
+                    isDragging = false;
+                }, 50);
+            });
+
+            let touchStartPos = null;
+            input.addEventListener('touchstart', (e) => {
+                touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                isDragging = false;
+            });
+
+            input.addEventListener('touchmove', (e) => {
+                if (touchStartPos) {
+                    const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
+                    const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
+                    if (dx > 5 || dy > 5) {
+                        isDragging = true;
+                    }
+                }
+            });
+
+            input.addEventListener('touchend', () => {
+                touchStartPos = null;
+                setTimeout(() => {
+                    isDragging = false;
+                }, 50);
+            });
+
+            const handleClick = (e) => {
+                if (isDragging) {
+                    return;
+                }
+
+                const videoSrc = slider.dataset.video;
+                openVideoModal(videoSrc);
+            };
+
+            slider.addEventListener('click', handleClick);
+            input.addEventListener('click', handleClick);
+        }
+
+        function openVideoModal(videoSrc) {
+            const modal = document.getElementById('video-modal');
+            const video = document.getElementById('modal-video');
+            const source = video.querySelector('source');
+
+            console.log('Opening video:', videoSrc); // 调试信息
+
+            video.pause();
+            video.currentTime = 0;
+
+            source.src = videoSrc;
+            video.load();
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+
+            video.onerror = function(e) {
+                console.error('Video failed to load:', videoSrc);
+                console.error('Error details:', e);
+                console.error('Video error code:', video.error ? video.error.code : 'unknown');
+                console.error('Video error message:', video.error ? video.error.message : 'unknown');
+
+                let errorMsg = 'video error\n';
+                errorMsg += 'Path: ' + videoSrc + '\n';
+                if (video.error) {
+                    errorMsg += 'Error Code: ' + video.error.code + '\n';
+                    errorMsg += 'Error Msg: ' + video.error.message;
+                }
+                alert(errorMsg);
+            };
+
+            video.onloadeddata = function() {
+                console.log('Video loaded successfully:', videoSrc);
+                console.log('Video duration:', video.duration);
+                console.log('Video dimensions:', video.videoWidth, 'x', video.videoHeight);
+            };
+
+            video.onplay = function() {
+                console.log('Video started playing');
+            };
+
+
+            video.onpause = function() {
+                console.log('Video paused');
+            };
+
+            video.play().catch(err => {
+                console.error('Play failed:', err);
+            });
+        }
+
+        function closeVideoModal() {
+            const modal = document.getElementById('video-modal');
+            const video = document.getElementById('modal-video');
+
+            video.pause();
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = 'auto';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const mainResults = document.getElementById('main-results');
+            const moreResultsGrid = document.getElementById('more-results-grid');
+            const showMoreBtn = document.getElementById('show-more-btn');
+            const moreResultsModal = document.getElementById('more-results-modal');
+            const closeMoreModalBtn = document.getElementById('close-more-modal');
+
+            const comparisonResults = document.getElementById('comparison-results');
+            const moreComparisonGrid = document.getElementById('more-comparison-grid');
+            const showMoreComparisonBtn = document.getElementById('show-more-comparison-btn');
+            const moreComparisonModal = document.getElementById('more-comparison-modal');
+            const closeMoreComparisonModalBtn = document.getElementById('close-more-comparison-modal');
+
+            const closeModalBtn = document.getElementById('close-modal');
+            const modal = document.getElementById('video-modal');
+            videoData.slice(0, 6).forEach(data => {
+                const slider = createComparisonSlider(data);
+                mainResults.appendChild(slider);
+                initSlider(slider);
+            });
+
+            videoData.slice(6).forEach(data => {
+                const slider = createComparisonSlider(data);
+                moreResultsGrid.appendChild(slider);
+                initSlider(slider);
+            });
+
+            comparisonVideoData.slice(0, 3).forEach(videoData => {
+                const card = createComparisonVideoCard(videoData);
+                comparisonResults.appendChild(card);
+                initComparisonVideoCard(card);
+            });
+
+
+            comparisonVideoData.slice(3).forEach(videoData => {
+                const card = createComparisonVideoCard(videoData);
+                moreComparisonGrid.appendChild(card);
+                initComparisonVideoCard(card);
+            });
+
+
+            showMoreBtn.addEventListener('click', () => {
+                moreResultsModal.classList.remove('hidden');
+                moreResultsModal.classList.add('flex');
+                document.body.style.overflow = 'hidden';
+            });
+
+
+            function closeMoreResultsModal() {
+                moreResultsModal.classList.add('hidden');
+                moreResultsModal.classList.remove('flex');
+                document.body.style.overflow = 'auto';
+            }
+
+            closeMoreModalBtn.addEventListener('click', closeMoreResultsModal);
+            moreResultsModal.addEventListener('click', (e) => {
+                if (e.target === moreResultsModal) {
+                    closeMoreResultsModal();
+                }
+            });
+
+            showMoreComparisonBtn.addEventListener('click', () => {
+                moreComparisonModal.classList.remove('hidden');
+                moreComparisonModal.classList.add('flex');
+                document.body.style.overflow = 'hidden';
+            });
+
+
+            function closeMoreComparisonModal() {
+                moreComparisonModal.classList.add('hidden');
+                moreComparisonModal.classList.remove('flex');
+                document.body.style.overflow = 'auto';
+            }
+
+            closeMoreComparisonModalBtn.addEventListener('click', closeMoreComparisonModal);
+            moreComparisonModal.addEventListener('click', (e) => {
+                if (e.target === moreComparisonModal) {
+                    closeMoreComparisonModal();
+                }
+            });
+
+            closeModalBtn.addEventListener('click', closeVideoModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeVideoModal();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeVideoModal();
+                    closeMoreResultsModal();
+                    closeMoreComparisonModal();
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
